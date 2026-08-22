@@ -137,17 +137,26 @@ impl<'f, 'a> Hinter<'f, 'a> {
     }
 }
 
-/// FUnit → 26.6 pixels, rounded to nearest (ties away from zero) —
-/// `FT_MulFix(v, ppem*64*65536/upem)` equivalent computed exactly.
+/// FUnit → 26.6 pixels exactly as FreeType does it: the scale is first
+/// quantized to 16.16 with `FT_DivFix(ppem·64, upem)`, then applied with
+/// `FT_MulFix` (round to nearest, symmetric around zero).
 #[inline]
 pub fn scale_funit(v: i16, ppem: i32, upem: u16) -> i32 {
     scale_funit_i32(i32::from(v), ppem, upem)
 }
 
+/// 16.16 scale factor `ppem·64 / upem` rounded like `FT_DivFix`.
+#[inline]
+pub fn ft_scale(ppem: i32, upem: u16) -> i64 {
+    let a = i64::from(ppem) * 64;
+    let b = i64::from(upem).max(1);
+    ((a << 16) + b / 2) / b
+}
+
 #[inline]
 pub fn scale_funit_i32(v: i32, ppem: i32, upem: u16) -> i32 {
-    let num = i64::from(v) * i64::from(ppem) * 64;
-    let den = i64::from(upem).max(1);
-    let q = (num.abs() + den / 2) / den;
-    (if num < 0 { -q } else { q }) as i32
+    let s = ft_scale(ppem, upem);
+    let prod = i64::from(v).abs() * s;
+    let c = (prod + 0x8000) >> 16;
+    (if v < 0 { -c } else { c }) as i32
 }

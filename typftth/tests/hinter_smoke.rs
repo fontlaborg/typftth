@@ -18,7 +18,8 @@ fn cvt_is_scaled_to_pixels() {
     let mut m = typftth::Machine::new(f.maxp, f.cvt.len());
     m.set_ppem(16, f.units_per_em as i16);
     let raw = f.cvt[0] as i64; // FUnits
-    let px26_6 = (raw as f64 * 16.0 * 64.0 / 1000.0).round() as i32;
+    // FT_DivFix(1024, 1000) = 67109; FT_MulFix(raw, 67109)
+    let px26_6 = ((raw * 67109 + 0x8000) >> 16) as i32;
     let scaled = typftth::hinter::scale_funit_i32(raw as i32, 16, f.units_per_em);
     assert_eq!(scaled, px26_6, "cvt[0] raw {raw}");
     let _ = m;
