@@ -72,9 +72,10 @@ impl<'f, 'a> Hinter<'f, 'a> {
         let mut m = Machine::new(font.maxp, cvt_funits.len());
         m.set_ppem(ppem, font.units_per_em as i16);
         m.set_coords(coords);
-        // CVT: FUnits → 26.6 pixels with the same factor WCVTF uses.
+        // CVT: FUnits → 26.6 pixels with the same factor WCVTF uses
+        // (`units_per_em_scale` = ppem·64/upem already includes the ×64).
         let scale = m.scale.units_per_em_scale.x;
-        let cvt: Vec<i32> = cvt_funits.iter().map(|&v| F26Dot6::from_int(v).mul_f16_up(scale).0).collect();
+        let cvt: Vec<i32> = cvt_funits.iter().map(|&v| F26Dot6(v).mul_f16_up(scale).0).collect();
         m.set_cvt(&cvt);
         let code = Code { fpgm: font.fpgm, prep: font.prep, glyf: &[] };
         let mut prep_error = None;
