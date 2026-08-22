@@ -1164,9 +1164,10 @@ impl<'m, 'a, 'g> Run<'m, 'a, 'g> {
         const VERTICAL: u32 = 1 << 4;
         const QUICKDRAW_GX_VERSION: u32 = 7;
         let selector = self.pop()? as u32;
+        let profile = self.m.getinfo;
         let mut result: u32 = 0;
         if selector & VERSION != 0 {
-            result = QUICKDRAW_GX_VERSION;
+            result = if profile.is_gx() { QUICKDRAW_GX_VERSION } else { profile.version };
         }
         if selector & ROTATED != 0 && self.m.scale.is_rotated {
             result |= 1 << 8;
@@ -1174,11 +1175,35 @@ impl<'m, 'a, 'g> Run<'m, 'a, 'g> {
         if selector & STRETCHED != 0 && self.m.scale.is_stretched {
             result |= 1 << 9;
         }
-        if selector & VARIATION != 0 {
+        if selector & VARIATION != 0 && profile.variation {
             result |= 1 << 10;
         }
-        if selector & VERTICAL != 0 {
-            result |= 1 << 11;
+        if profile.is_gx() {
+            if selector & VERTICAL != 0 {
+                result |= 1 << 11;
+            }
+        } else {
+            // FreeType `Ins_GETINFO` (2.13.2): grayscale + v40 ClearType bits.
+            if selector & 32 != 0 && profile.grayscale {
+                result |= 1 << 12;
+            }
+            if profile.subpixel {
+                if selector & 64 != 0 {
+                    result |= 1 << 13;
+                }
+                if selector & 256 != 0 && profile.vertical_lcd {
+                    result |= 1 << 15;
+                }
+                if selector & 1024 != 0 {
+                    result |= 1 << 17;
+                }
+                if selector & 2048 != 0 {
+                    result |= 1 << 18;
+                }
+                if selector & 4096 != 0 && profile.grayscale_cleartype {
+                    result |= 1 << 19;
+                }
+            }
         }
         self.push(result as i32)
     }

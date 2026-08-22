@@ -43,7 +43,7 @@ pub use error::{InterpreterError, LoadError};
 pub use exec::{Code, Program};
 pub use fixed::{F16Dot16, F26Dot6, F2Dot14};
 pub use gs::{GraphicsState, RoundState, ScaleFactors, ZoneType};
-pub use interp::{Machine, Maxp};
+pub use interp::{GetInfoProfile, Machine, Maxp};
 pub use trace::{Flow, NoTrace, StepObserver, StepView};
 pub use zone::Zone;
 

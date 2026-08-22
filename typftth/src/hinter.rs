@@ -13,7 +13,7 @@ use crate::error::LoadError;
 use crate::exec::{Code, Program};
 use crate::fixed::{F26Dot6, F2Dot14};
 use crate::gs::ZoneType;
-use crate::interp::Machine;
+use crate::interp::{GetInfoProfile, Machine};
 use crate::loader::{GlyphOutline, HintFont};
 use crate::trace::{NoTrace, StepObserver};
 use crate::zone::{Zone, PRIVATE_PHANTOM_COUNT};
@@ -68,8 +68,21 @@ impl<'a> Hinter<'a> {
         coords: &[F2Dot14],
         observer: &mut dyn StepObserver,
     ) -> Result<Hinter<'a>, LoadError> {
+        Self::with_options(font, ppem, coords, GetInfoProfile::default(), observer)
+    }
+
+    /// Full constructor: choose what `GETINFO` reports (see
+    /// [`GetInfoProfile`]) before `fpgm`/`prep` run, and trace them.
+    pub fn with_options(
+        font: HintFont<'a>,
+        ppem: i32,
+        coords: &[F2Dot14],
+        getinfo: GetInfoProfile,
+        observer: &mut dyn StepObserver,
+    ) -> Result<Hinter<'a>, LoadError> {
         let cvt_fdot6 = font.cvt_at(coords);
         let mut m = Machine::new(font.maxp, cvt_fdot6.len());
+        m.getinfo = getinfo;
         m.set_ppem(ppem, font.units_per_em as i16);
         m.set_coords(coords);
         let cvt: Vec<i32> = cvt_fdot6.iter().map(|&v| scale_cvt(v, ppem, font.units_per_em)).collect();

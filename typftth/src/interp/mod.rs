@@ -63,6 +63,68 @@ pub const MAX_STACK: usize = u16::MAX as usize;
 /// Swift `kFairDiceRoll`.
 pub const FAIR_DICE_ROLL: u32 = 17;
 
+/// What `GETINFO` reports. The default is the reference interpreter's
+/// (QuickDraw GX, version 7, no rasterizer flags). Set `version` to 35 or
+/// 40 with the render flags to mimic FreeType's `Ins_GETINFO`, so fonts
+/// that gate hinting on the rasterizer version (VTT/ClearType-era) take
+/// the same branches as FreeType does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct GetInfoProfile {
+    /// Rasterizer version reported for selector bit 0.
+    pub version: u32,
+    /// Grayscale rendering (result bit 12, selector 32).
+    pub grayscale: bool,
+    /// v40 "subpixel hinting lean" (result bits 13/17/18; selectors 64/1024/2048).
+    pub subpixel: bool,
+    /// Vertical LCD (result bit 15, selector 256); needs `subpixel`.
+    pub vertical_lcd: bool,
+    /// Grayscale ClearType (result bit 19, selector 4096); needs `subpixel`.
+    pub grayscale_cleartype: bool,
+    /// Report "font variations" (result bit 10, selector 8).
+    pub variation: bool,
+}
+
+impl GetInfoProfile {
+    /// Apple's reference: version 7; variation and vertical bits whenever selected.
+    pub const GX: GetInfoProfile = GetInfoProfile {
+        version: 7,
+        grayscale: false,
+        subpixel: false,
+        vertical_lcd: false,
+        grayscale_cleartype: false,
+        variation: true,
+    };
+
+    /// FreeType v35 (`interpreter-version` 35): `grayscale` = any target but mono.
+    pub fn freetype_v35(grayscale: bool, variation: bool) -> GetInfoProfile {
+        GetInfoProfile { version: 35, grayscale, subpixel: false, vertical_lcd: false, grayscale_cleartype: false, variation }
+    }
+
+    /// FreeType v40: subpixel hinting lean is always on; `lcd`/`lcd_v` pick
+    /// the ClearType flavour, anything else is grayscale ClearType.
+    pub fn freetype_v40(mono: bool, lcd: bool, lcd_v: bool, variation: bool) -> GetInfoProfile {
+        GetInfoProfile {
+            version: 40,
+            grayscale: !mono,
+            subpixel: true,
+            vertical_lcd: lcd_v,
+            grayscale_cleartype: !(lcd || lcd_v),
+            variation,
+        }
+    }
+
+    /// Is this the reference (GX) behaviour?
+    pub fn is_gx(&self) -> bool {
+        self.version == 7 && !self.subpixel
+    }
+}
+
+impl Default for GetInfoProfile {
+    fn default() -> Self {
+        GetInfoProfile::GX
+    }
+}
+
 /// Interpreter state that survives between program runs: CVT, storage,
 /// function tables, graphics-state parameters, twilight zone, scale.
 #[derive(Clone, Debug)]
@@ -84,6 +146,8 @@ pub struct Machine {
     pub coords: Vec<F2Dot14>,
     /// prep → glyf parameters.
     pub params: Parameters,
+    /// What `GETINFO` reports (host choice; default GX).
+    pub getinfo: GetInfoProfile,
 }
 
 impl Machine {
@@ -104,6 +168,7 @@ impl Machine {
             twilight: Zone::with_capacity(ZoneType::Twilight, (maxp.max_twilight_points as usize).max(1), 1),
             coords: Vec::new(),
             params: Parameters::default(),
+            getinfo: GetInfoProfile::default(),
         }
     }
 

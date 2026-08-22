@@ -15,7 +15,13 @@
   align 1:1 with FreeType's.
 
 ### Added
-- `typftth hint --trace FILE --program prep|fpgm` records the setup programs.
+- `GetInfoProfile` (`Machine::getinfo`, `Hinter::with_options`): what `GETINFO`
+  reports. Default stays Apple's GX (version 7); `freetype_v35`/`freetype_v40`
+  reproduce FreeType's `Ins_GETINFO` (grayscale / ClearType bits) so fonts that
+  gate hinting on the rasterizer version take the same branches.
+- `typftth hint --trace FILE --program prep|fpgm` records the setup programs;
+  `--getinfo gx|35|40 --render mono|gray|lcd|lcd-v` select the profile.
+- wasm: `TthFont.recordWith(gid, ppem, coords, version, render)`.
 
 ## 0.1.0 — 2026-08-22
 

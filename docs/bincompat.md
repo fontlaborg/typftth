@@ -43,7 +43,7 @@ implementation would produce different pixels.
 | 32 | EIF is a no-op; ENDF outside a definition is an error | `Interpreter.swift` (EIF/ENDF) | `dispatch` |
 | 33 | DIV by zero returns ±MAX instead of failing | `Interpreter.swift` (DIV) | `dispatch(DIV)` |
 | 34 | MUL rounds ties-up inside ±46340, ties-away outside | `Interpreter.swift` (MUL) | `dispatch(MUL)` |
-| 35 | GETINFO: version 7 (GX); `variation` and `verticalMetrics` result bits set whenever selected | `Interpreter.swift:887-928` | `Run::getinfo` |
+| 35 | GETINFO: version 7 (GX); `variation` and `verticalMetrics` result bits set whenever selected — the default `GetInfoProfile`; hosts may switch to FreeType's v35/v40 reporting | `Interpreter.swift:887-928` | `Run::getinfo` |
 | 36 | GETDATA(1) returns 17 % n ("fair dice roll") | `Interpreter.swift:867-885` | `dispatch(GETDATA)` |
 | 37 | WCVTP in `fpgm`, or when the rescale would be a no-op, writes the value unscaled | `Interpreter.swift` (WCVTP) | `dispatch(WCVTP)` |
 | 38 | Glyph-program errors roll the glyph zone (outline + 4 public phantoms) back to the scaled outline | `Interpreter.swift:439,490-493`, `Zone.swift:173-178` | `Machine::run`, `Zone::rollback` |

@@ -8,7 +8,7 @@ use clap::{Parser, Subcommand};
 use typftth::hinter::Hinter;
 use typftth::loader::HintFont;
 use typftth::trace::{Recorder, StepCounter};
-use typftth::F2Dot14;
+use typftth::{F2Dot14, GetInfoProfile};
 
 #[derive(Parser)]
 #[command(name = "typftth", version, about = "TrueType hinting interpreter (Apple GX lineage)")]
@@ -44,6 +44,12 @@ enum Cmd {
         /// Which program the trace records: glyf (default), prep or fpgm.
         #[arg(long, default_value = "glyf")]
         program: String,
+        /// What GETINFO reports: `gx` (Apple, version 7), `35` or `40` (FreeType).
+        #[arg(long, default_value = "gx")]
+        getinfo: String,
+        /// Render target used for the FreeType-style GETINFO flags: mono, gray, lcd, lcd-v.
+        #[arg(long, default_value = "mono")]
+        render: String,
     },
     /// Hint every glyph at several sizes and report errors (corpus check).
     Sweep {
@@ -101,10 +107,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 println!("axis {} {}..{}..{}", String::from_utf8_lossy(&a.tag), a.min, a.default, a.max);
             }
         }
-        Cmd::Hint { font, index, gid, ppem, vars, trace, program } => {
+        Cmd::Hint { font, index, gid, ppem, vars, trace, program, getinfo, render } => {
             let data = std::fs::read(&font)?;
             let f = HintFont::parse(&data, index)?;
             let coords: Vec<F2Dot14> = f.location(&parse_vars(&vars));
+            let profile = getinfo_profile(&getinfo, &render, !f.axes.is_empty())?;
             let only = match program.as_str() {
                 "glyf" => typftth::exec::Program::Glyf,
                 "prep" => typftth::exec::Program::Prep,
@@ -115,9 +122,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             rec.only = Some(only);
             let trace_setup = trace.is_some() && only != typftth::exec::Program::Glyf;
             let mut h = if trace_setup {
-                Hinter::with_observer(f.clone(), ppem, &coords, &mut rec)?
+                Hinter::with_options(f.clone(), ppem, &coords, profile, &mut rec)?
             } else {
-                Hinter::new(f.clone(), ppem, &coords)?
+                Hinter::with_options(f.clone(), ppem, &coords, profile, &mut typftth::NoTrace)?
             };
             if let Some(e) = h.prep_error {
                 eprintln!("prep failed: {e}");
@@ -202,6 +209,23 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     Ok(())
+}
+
+/// Parse `--getinfo` / `--render` into a [`GetInfoProfile`].
+fn getinfo_profile(version: &str, render: &str, variation: bool) -> Result<GetInfoProfile, String> {
+    let (mono, lcd, lcd_v) = match render {
+        "mono" => (true, false, false),
+        "gray" | "grey" => (false, false, false),
+        "lcd" => (false, true, false),
+        "lcd-v" | "lcdv" => (false, false, true),
+        other => return Err(format!("unknown --render {other} (mono|gray|lcd|lcd-v)")),
+    };
+    Ok(match version {
+        "gx" | "7" => GetInfoProfile::GX,
+        "35" => GetInfoProfile::freetype_v35(!mono, variation),
+        "40" => GetInfoProfile::freetype_v40(mono, lcd, lcd_v, variation),
+        other => return Err(format!("unknown --getinfo {other} (gx|35|40)")),
+    })
 }
 
 fn index_of(_p: &std::path::Path) -> u32 {
