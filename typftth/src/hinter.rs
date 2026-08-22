@@ -75,7 +75,8 @@ impl<'f, 'a> Hinter<'f, 'a> {
         // CVT: FUnits → 26.6 pixels with the same factor WCVTF uses
         // (`units_per_em_scale` = ppem·64/upem already includes the ×64).
         let scale = m.scale.units_per_em_scale.x;
-        let cvt: Vec<i32> = cvt_funits.iter().map(|&v| F26Dot6(v).mul_f16_up(scale).0).collect();
+        let _ = scale;
+        let cvt: Vec<i32> = cvt_funits.iter().map(|&v| scale_funit_i32(v, ppem, font.units_per_em)).collect();
         m.set_cvt(&cvt);
         let code = Code { fpgm: font.fpgm, prep: font.prep, glyf: &[] };
         let mut prep_error = None;
@@ -105,11 +106,14 @@ impl<'f, 'a> Hinter<'f, 'a> {
         &self.base
     }
 
-    /// FUnit → 26.6 at this ppem (Apple's `HinterContext.scale`: truncating).
+    /// FUnit → 26.6 at this ppem. Rounds to nearest (ties away from zero)
+    /// like FreeType's `FT_MulFix`, so unhinted outlines match FreeType's
+    /// exactly and engine comparisons only show interpreter differences.
+    /// (Apple's benchmark harness truncated; that is a host choice, not an
+    /// interpreter rule.)
     #[inline]
     pub fn scale_funits(&self, v: i16) -> i32 {
-        let prod = i64::from(v) * i64::from(self.ppem) * 64;
-        (prod / i64::from(self.font.units_per_em)) as i32
+        scale_funit(v, self.ppem, self.font.units_per_em)
     }
 
     /// Load a glyph into a fresh zone, run its program, return the result.
@@ -117,9 +121,9 @@ impl<'f, 'a> Hinter<'f, 'a> {
         let outline = self.font.glyph(gid, &self.coords)?;
         let mut zone = self.zone.clone();
         let ppem = self.ppem;
-        let upem = i64::from(self.font.units_per_em);
+        let upem = self.font.units_per_em;
         zone.load_outline(&outline.xs, &outline.ys, &outline.on_curve, &outline.end_pts, outline.phantoms, |v| {
-            ((i64::from(v) * i64::from(ppem) * 64) / upem) as i32
+            scale_funit(v, ppem, upem)
         });
         let mut m = self.base.clone();
         let code = Code { fpgm: self.font.fpgm, prep: self.font.prep, glyf: &outline.instructions };
@@ -131,4 +135,19 @@ impl<'f, 'a> Hinter<'f, 'a> {
         };
         Ok(HintedGlyph { zone, error, outline })
     }
+}
+
+/// FUnit → 26.6 pixels, rounded to nearest (ties away from zero) —
+/// `FT_MulFix(v, ppem*64*65536/upem)` equivalent computed exactly.
+#[inline]
+pub fn scale_funit(v: i16, ppem: i32, upem: u16) -> i32 {
+    scale_funit_i32(i32::from(v), ppem, upem)
+}
+
+#[inline]
+pub fn scale_funit_i32(v: i32, ppem: i32, upem: u16) -> i32 {
+    let num = i64::from(v) * i64::from(ppem) * 64;
+    let den = i64::from(upem).max(1);
+    let q = (num.abs() + den / 2) / den;
+    (if num < 0 { -q } else { q }) as i32
 }

@@ -19,8 +19,9 @@ fn cvt_is_scaled_to_pixels() {
     m.set_ppem(16, f.units_per_em as i16);
     let raw = f.cvt[0] as i64; // FUnits
     let px26_6 = (raw as f64 * 16.0 * 64.0 / 1000.0).round() as i32;
-    let scaled = typftth::F26Dot6(raw as i32).mul_f16_up(m.scale.units_per_em_scale.x).0;
-    assert!((scaled - px26_6).abs() <= 1, "cvt[0] raw {raw} → {scaled}, expected ≈ {px26_6}");
+    let scaled = typftth::hinter::scale_funit_i32(raw as i32, 16, f.units_per_em);
+    assert_eq!(scaled, px26_6, "cvt[0] raw {raw}");
+    let _ = m;
     // and through the hinter (post-prep) the value is in the pixel range, not FUnits<<6
     assert!(h.machine().cvt[0] < (raw << 6) as i32 / 8, "cvt[0] after prep = {} looks unscaled", h.machine().cvt[0]);
 }
