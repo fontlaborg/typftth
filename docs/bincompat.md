@@ -61,4 +61,5 @@ implementation would produce different pixels.
 | CVT at a variation location | `cvar` deltas (16.16) added at 1/64 FUnit precision (`FT_fixedToFdot6`) | FreeType `tt_face_vary_cvt` |
 | Composites | flattened in FUnits (component transform, offsets, `gvar` component deltas); only the composite program runs, with the "unscaled outline is wrong" correction when varied | Apple's harness contract; component stepping is a planned extension |
 | Twilight zone in `fpgm` | absent (access → error) | reference harness |
+| Out-of-range CVT index in MIAP/MIRP/WCVTP/WCVTF/DELTAC | reference: glyph program fails (rolled back); `Machine::lenient_cvt` opts into FreeType's non-pedantic behaviour | both are real-world behaviours; the debugger's FreeType-compatible profile uses the lenient one |
 | `INSTCTRL` no-grid-fit (selector 1) set in `prep` | glyph programs are skipped; the scaled outline is returned unrounded | FreeType (`FT_LOAD_NO_HINTING`); the reference harness ignores the flag |

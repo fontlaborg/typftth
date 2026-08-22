@@ -106,15 +106,26 @@ impl Machine {
     }
 
     pub(crate) fn cvt_write(&mut self, index: i32, value: F26Dot6) -> Result<(), InterpreterError> {
-        if index < 0 {
+        if index < 0 && !self.lenient_cvt {
             return Err(InterpreterError::CvtLocationOutOfBounds);
         }
-        match self.cvt.get_mut(index as usize) {
+        match usize::try_from(index).ok().and_then(|i| self.cvt.get_mut(i)) {
             Some(slot) => {
                 *slot = value.0;
                 Ok(())
             }
+            None if self.lenient_cvt => Ok(()),
             None => Err(InterpreterError::CvtLocationOutOfBounds),
+        }
+    }
+
+    /// `cvt_read_stretched` that, in lenient mode, reports an out-of-range
+    /// index as `None` instead of an error.
+    pub(crate) fn cvt_read_lenient(&mut self, index: i32) -> Result<Option<F26Dot6>, InterpreterError> {
+        match self.cvt_read_stretched(index) {
+            Ok(v) => Ok(Some(v)),
+            Err(InterpreterError::CvtLocationOutOfBounds) if self.lenient_cvt => Ok(None),
+            Err(e) => Err(e),
         }
     }
 }

@@ -121,10 +121,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             let mut rec = Recorder::new(f.units_per_em as u32, ppem as u32, gid);
             rec.only = Some(only);
             let trace_setup = trace.is_some() && only != typftth::exec::Program::Glyf;
+            let options = typftth::hinter::HinterOptions { getinfo: profile, lenient_cvt: getinfo != "gx" };
             let mut h = if trace_setup {
-                Hinter::with_options(f.clone(), ppem, &coords, profile, &mut rec)?
+                Hinter::with_options(f.clone(), ppem, &coords, options, &mut rec)?
             } else {
-                Hinter::with_options(f.clone(), ppem, &coords, profile, &mut typftth::NoTrace)?
+                Hinter::with_options(f.clone(), ppem, &coords, options, &mut typftth::NoTrace)?
             };
             if let Some(e) = h.prep_error {
                 eprintln!("prep failed: {e}");

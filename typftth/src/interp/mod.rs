@@ -148,6 +148,11 @@ pub struct Machine {
     pub params: Parameters,
     /// What `GETINFO` reports (host choice; default GX).
     pub getinfo: GetInfoProfile,
+    /// Tolerate out-of-range CVT indices like FreeType's non-pedantic mode
+    /// (MIAP/MIRP skip the move but still set reference points, WCVTP/WCVTF/
+    /// DELTAC are no-ops, RCVT reads 0) instead of failing the glyph program
+    /// (the reference behaviour, default).
+    pub lenient_cvt: bool,
 }
 
 impl Machine {
@@ -169,6 +174,7 @@ impl Machine {
             coords: Vec::new(),
             params: Parameters::default(),
             getinfo: GetInfoProfile::default(),
+            lenient_cvt: false,
         }
     }
 

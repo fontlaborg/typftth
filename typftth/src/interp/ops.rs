@@ -287,7 +287,7 @@ impl<'m, 'a, 'g> Run<'m, 'a, 'g> {
                 match self.m.cvt_read_stretched(index) {
                     Ok(v) => self.push_f26(v),
                     Err(InterpreterError::CvtLocationOutOfBounds) => {
-                        if index < 0 {
+                        if index < 0 && !self.m.lenient_cvt {
                             return Err(InterpreterError::CvtLocationOutOfBounds);
                         }
                         self.push(0)
@@ -758,7 +758,12 @@ impl<'m, 'a, 'g> Run<'m, 'a, 'g> {
     fn miap(&mut self, round: bool) -> Result<(), InterpreterError> {
         let entry = self.pop()?;
         let point_index = self.pop()?;
-        let mut new_proj = self.m.cvt_read_stretched(entry)?;
+        let Some(mut new_proj) = self.m.cvt_read_lenient(entry)? else {
+            // FreeType non-pedantic `Ins_MIAP` Fail path: no move, rp0 = rp1 = point.
+            self.m.gs.rp0 = point_index;
+            self.m.gs.rp1 = point_index;
+            return Ok(());
+        };
         let zp0 = self.m.gs.zp0;
         let (zone, m) = self.zp(zp0)?;
         zone.check_against_maxp(&m.maxp)?;
@@ -781,8 +786,18 @@ impl<'m, 'a, 'g> Run<'m, 'a, 'g> {
 
     fn mirp(&mut self, imm: u8) -> Result<(), InterpreterError> {
         let entry = self.pop()?;
-        let mut distance = self.m.cvt_read_stretched(entry)?;
+        let cvt_value = self.m.cvt_read_lenient(entry)?;
         let point_index = self.pop()?;
+        let Some(mut distance) = cvt_value else {
+            // FreeType non-pedantic `Ins_MIRP` Fail path: rp1 = rp0, rp2 = point,
+            // rp0 = point when the set-rp0 flag is on; no move.
+            self.m.gs.rp1 = self.m.gs.rp0;
+            self.m.gs.rp2 = point_index;
+            if imm & 0x10 != 0 {
+                self.m.gs.rp0 = point_index;
+            }
+            return Ok(());
+        };
         let rp0 = self.m.gs.rp0;
         let (rp_scaled, rp_hinted) = {
             let z = self.zone(self.m.gs.zp0)?;

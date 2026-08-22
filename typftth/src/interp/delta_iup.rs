@@ -76,7 +76,12 @@ impl<'m, 'a, 'g> Run<'m, 'a, 'g> {
         let shift = self.m.gs.delta_shift;
         let m = &mut *self.m;
         walk_deltas(&pairs, fake, shift, |index, delta| {
-            let v = m.cvt_read(index)?;
+            let v = match m.cvt_read(index) {
+                Ok(v) => v,
+                // FreeType non-pedantic DELTAC: out-of-range entries are skipped.
+                Err(InterpreterError::CvtLocationOutOfBounds) if m.lenient_cvt => return Ok(()),
+                Err(e) => return Err(e),
+            };
             m.cvt_write(index, v.wrapping_add(delta))
         })
     }

@@ -66,10 +66,14 @@ typftth sweep Font.ttf --ppems 9,12,16,24,48      # corpus health check
 
 ## What it is not
 
-- Not FreeType: this is the GX interpreter (`GETINFO` version 7). It has no
-  v35/v40 "backward compatibility" modes, so VTT-hinted fonts that branch on
-  the rasterizer version take their "classic" path. FreeType stays the
-  oracle in the debugger; typftth is the second opinion.
+- Not FreeType: this is the GX interpreter (`GETINFO` version 7 by default).
+  It has no v35/v40 "backward compatibility" modes. With
+  `HinterOptions::freetype(GetInfoProfile::freetype_v35(..))` (CLI
+  `--getinfo 35|40`) it *reports* FreeType's version and render flags and
+  tolerates out-of-range CVT indices the way FreeType does, so fonts that
+  gate hinting on the rasterizer version take the same branches; the
+  arithmetic stays Apple's (e.g. `IP` truncates where FreeType rounds).
+  FreeType stays the oracle in the debugger; typftth is the second opinion.
 - Not a rasterizer: it produces hinted outlines. typf's `opixa` backend
   rasterizes them.
 - Composite glyphs are flattened before hinting (component programs are
@@ -77,9 +81,13 @@ typftth sweep Font.ttf --ppems 9,12,16,24,48      # corpus health check
 
 ## Scaling
 
-Points and CVT entries are scaled like FreeType (`FT_DivFix`/`FT_MulFix`,
-round to nearest) so unhinted outlines are identical to FreeType's and
-engine comparisons only show interpreter differences.
+Points are scaled like FreeType (`FT_DivFix`/`FT_MulFix`, round to nearest)
+and CVT entries exactly like FreeType's `tt_size_run_prep` (26.6 FUnits ×
+`scale >> 6`, which is *not* the same rounding), so unhinted outlines and
+the initial CVT are identical to FreeType's and engine comparisons only show
+interpreter differences. On a 27-font variable corpus at 12/16/24 ppem,
+99.2 % of simple glyphs hint to within 1/64 px of FreeType v35; the rest
+differ through `IP` rounding. See `docs/bincompat.md`.
 
 ## Licence
 

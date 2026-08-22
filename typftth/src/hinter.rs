@@ -43,6 +43,23 @@ impl HintedGlyph {
     }
 }
 
+/// Host choices for a [`Hinter`] (all default to the reference behaviour).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct HinterOptions {
+    /// What `GETINFO` reports.
+    pub getinfo: GetInfoProfile,
+    /// Tolerate out-of-range CVT indices like FreeType (non-pedantic).
+    pub lenient_cvt: bool,
+}
+
+impl HinterOptions {
+    /// Behave like FreeType as far as the host can: v35/v40 `GETINFO`
+    /// reporting for the given target and lenient CVT access.
+    pub fn freetype(getinfo: GetInfoProfile) -> HinterOptions {
+        HinterOptions { getinfo, lenient_cvt: true }
+    }
+}
+
 /// Hinting context for one (font, ppem, location).
 pub struct Hinter<'a> {
     pub font: HintFont<'a>,
@@ -68,21 +85,22 @@ impl<'a> Hinter<'a> {
         coords: &[F2Dot14],
         observer: &mut dyn StepObserver,
     ) -> Result<Hinter<'a>, LoadError> {
-        Self::with_options(font, ppem, coords, GetInfoProfile::default(), observer)
+        Self::with_options(font, ppem, coords, HinterOptions::default(), observer)
     }
 
-    /// Full constructor: choose what `GETINFO` reports (see
-    /// [`GetInfoProfile`]) before `fpgm`/`prep` run, and trace them.
+    /// Full constructor: choose the host options (what `GETINFO` reports,
+    /// CVT leniency) before `fpgm`/`prep` run, and trace them.
     pub fn with_options(
         font: HintFont<'a>,
         ppem: i32,
         coords: &[F2Dot14],
-        getinfo: GetInfoProfile,
+        options: HinterOptions,
         observer: &mut dyn StepObserver,
     ) -> Result<Hinter<'a>, LoadError> {
         let cvt_fdot6 = font.cvt_at(coords);
         let mut m = Machine::new(font.maxp, cvt_fdot6.len());
-        m.getinfo = getinfo;
+        m.getinfo = options.getinfo;
+        m.lenient_cvt = options.lenient_cvt;
         m.set_ppem(ppem, font.units_per_em as i16);
         m.set_coords(coords);
         let cvt: Vec<i32> = cvt_fdot6.iter().map(|&v| scale_cvt(v, ppem, font.units_per_em)).collect();

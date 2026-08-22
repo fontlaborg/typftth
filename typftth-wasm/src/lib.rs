@@ -6,7 +6,7 @@
 
 use wasm_bindgen::prelude::*;
 
-use typftth::hinter::Hinter;
+use typftth::hinter::{Hinter, HinterOptions};
 use typftth::loader::HintFont;
 use typftth::trace::Recorder;
 use typftth::{F2Dot14, GetInfoProfile};
@@ -76,21 +76,23 @@ impl TthFont {
         Ok(rec.to_blob())
     }
 
-    /// Like `record`, choosing what `GETINFO` reports: `version` 7 (Apple
-    /// GX, the default), 35 or 40 (FreeType); `render` 0 = gray, 1 = mono,
-    /// 2 = LCD, 3 = vertical LCD (the debugger's `TT_RENDER_*` codes).
+    /// Like `record`, choosing the host profile: `version` 7 (Apple GX, the
+    /// default) or 35 / 40 (FreeType `GETINFO` reporting plus FreeType's
+    /// non-pedantic tolerance of out-of-range CVT indices); `render` 0 =
+    /// gray, 1 = mono, 2 = LCD, 3 = vertical LCD (the debugger's
+    /// `TT_RENDER_*` codes).
     #[wasm_bindgen(js_name = recordWith)]
     pub fn record_with(&self, gid: u32, ppem: u32, coords: &[i16], version: u32, render: u32) -> Result<Vec<u8>, JsError> {
         let f = HintFont::parse(&self.data, self.index).map_err(|e| JsError::new(&e.to_string()))?;
         let coords: Vec<F2Dot14> = coords.iter().map(|&c| F2Dot14(c)).collect();
         let variation = !f.axes.is_empty();
         let mono = render == 1;
-        let profile = match version {
-            35 => GetInfoProfile::freetype_v35(!mono, variation),
-            40 => GetInfoProfile::freetype_v40(mono, render == 2, render == 3, variation),
-            _ => GetInfoProfile::GX,
+        let options = match version {
+            35 => HinterOptions::freetype(GetInfoProfile::freetype_v35(!mono, variation)),
+            40 => HinterOptions::freetype(GetInfoProfile::freetype_v40(mono, render == 2, render == 3, variation)),
+            _ => HinterOptions::default(),
         };
-        let mut h = Hinter::with_options(f.clone(), ppem as i32, &coords, profile, &mut typftth::NoTrace)
+        let mut h = Hinter::with_options(f.clone(), ppem as i32, &coords, options, &mut typftth::NoTrace)
             .map_err(|e| JsError::new(&e.to_string()))?;
         let mut rec = Recorder::new(self.upem, ppem, gid);
         let g = h.hint_glyph(gid, &mut rec).map_err(|e| JsError::new(&e.to_string()))?;

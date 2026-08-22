@@ -24,7 +24,13 @@
   gate hinting on the rasterizer version take the same branches.
 - `typftth hint --trace FILE --program prep|fpgm` records the setup programs;
   `--getinfo gx|35|40 --render mono|gray|lcd|lcd-v` select the profile.
-- wasm: `TthFont.recordWith(gid, ppem, coords, version, render)`.
+- `HinterOptions { getinfo, lenient_cvt }` / `Machine::lenient_cvt`: FreeType's
+  non-pedantic tolerance of out-of-range CVT indices (MIAP/MIRP skip the
+  move but set reference points, WCVTP/WCVTF/DELTAC no-op, RCVT reads 0).
+  `HinterOptions::freetype(profile)` turns both on; the CLI does so for
+  `--getinfo 35|40`.
+- wasm: `TthFont.recordWith(gid, ppem, coords, version, render)` (FreeType
+  profile when `version` is 35 or 40).
 
 ## 0.1.0 — 2026-08-22
 
