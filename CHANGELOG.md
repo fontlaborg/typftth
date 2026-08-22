@@ -1,7 +1,7 @@
 <!-- this_file: CHANGELOG.md -->
 # Changelog
 
-## Unreleased
+## 0.2.0 — 2026-08-22
 
 ### Fixed
 - CVT scaling now reproduces FreeType's `tt_size_run_prep` exactly: entries are
