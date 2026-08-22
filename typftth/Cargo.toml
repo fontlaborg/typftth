@@ -1,0 +1,24 @@
+# this_file: typftth/Cargo.toml
+[package]
+name = "typftth"
+description = "TrueType hinting bytecode interpreter (Apple GX lineage) with step tracing, for typf and the FontLab TTH Debugger."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+keywords = ["truetype", "hinting", "font", "interpreter"]
+categories = ["text-processing", "parsing"]
+
+[features]
+default = ["std", "loader"]
+std = []
+loader = ["dep:read-fonts", "dep:skrifa"]
+
+[dependencies]
+read-fonts = { workspace = true, optional = true }
+skrifa = { workspace = true, optional = true }
+
+[lints]
+workspace = true

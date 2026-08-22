@@ -1,0 +1,7 @@
+typftth — TrueType hinting interpreter
+Copyright 2026 Fontlab Ltd.
+
+The interpreter is a Rust port of Apple Inc.'s "truetype-hinting-interpreter-example"
+(https://github.com/apple/truetype-hinting-interpreter-example), published under the
+MIT License, Copyright 2026 Apple Inc. The MIT notice is reproduced in
+_private/truetype-hinting-interpreter-example/LICENSE.

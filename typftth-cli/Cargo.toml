@@ -1,0 +1,23 @@
+# this_file: typftth-cli/Cargo.toml
+[package]
+name = "typftth-cli"
+description = "Command line for typftth: hint glyphs and dump traces."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "typftth"
+path = "src/main.rs"
+
+[dependencies]
+typftth = { path = "../typftth" }
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

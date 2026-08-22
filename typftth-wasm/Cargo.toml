@@ -1,0 +1,21 @@
+# this_file: typftth-wasm/Cargo.toml
+[package]
+name = "typftth-wasm"
+description = "wasm-bindgen surface of typftth for the FontLab TTH Debugger."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+typftth = { path = "../typftth" }
+wasm-bindgen = { workspace = true }
+
+[lints]
+workspace = true
