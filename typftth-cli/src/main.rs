@@ -41,6 +41,9 @@ enum Cmd {
         /// Write the debugger snapshot blob (v1) to this file.
         #[arg(long)]
         trace: Option<PathBuf>,
+        /// Which program the trace records: glyf (default), prep or fpgm.
+        #[arg(long, default_value = "glyf")]
+        program: String,
     },
     /// Hint every glyph at several sizes and report errors (corpus check).
     Sweep {
@@ -98,20 +101,39 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 println!("axis {} {}..{}..{}", String::from_utf8_lossy(&a.tag), a.min, a.default, a.max);
             }
         }
-        Cmd::Hint { font, index, gid, ppem, vars, trace } => {
+        Cmd::Hint { font, index, gid, ppem, vars, trace, program } => {
             let data = std::fs::read(&font)?;
             let f = HintFont::parse(&data, index)?;
             let coords: Vec<F2Dot14> = f.location(&parse_vars(&vars));
-            let mut h = Hinter::new(f.clone(), ppem, &coords)?;
+            let only = match program.as_str() {
+                "glyf" => typftth::exec::Program::Glyf,
+                "prep" => typftth::exec::Program::Prep,
+                "fpgm" => typftth::exec::Program::Fpgm,
+                other => return Err(format!("unknown --program {other} (glyf|prep|fpgm)").into()),
+            };
+            let mut rec = Recorder::new(f.units_per_em as u32, ppem as u32, gid);
+            rec.only = Some(only);
+            let trace_setup = trace.is_some() && only != typftth::exec::Program::Glyf;
+            let mut h = if trace_setup {
+                Hinter::with_observer(f.clone(), ppem, &coords, &mut rec)?
+            } else {
+                Hinter::new(f.clone(), ppem, &coords)?
+            };
             if let Some(e) = h.prep_error {
                 eprintln!("prep failed: {e}");
             }
             let g = if let Some(path) = trace {
-                let mut rec = Recorder::new(f.units_per_em as u32, ppem as u32, gid);
-                let g = h.hint_glyph(gid, &mut rec)?;
-                rec.finish(&g.zone, g.error);
+                let g = if trace_setup {
+                    let g = h.hint_glyph(gid, &mut typftth::NoTrace)?;
+                    rec.finish(&g.zone, h.prep_error);
+                    g
+                } else {
+                    let g = h.hint_glyph(gid, &mut rec)?;
+                    rec.finish(&g.zone, g.error);
+                    g
+                };
                 std::fs::write(&path, rec.to_blob())?;
-                eprintln!("trace: {} steps → {}", rec.step_count(), path.display());
+                eprintln!("trace ({program}): {} steps → {}", rec.step_count(), path.display());
                 g
             } else {
                 let mut counter = StepCounter::default();

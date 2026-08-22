@@ -695,10 +695,15 @@ impl ScaleFactors {
             is_stretched,
             cvt_stretch: stretch.div_saturating(cvt_scale, Rounding::TowardZero),
             integer_ppem: (fixed_round(stretch.x), fixed_round(stretch.y)),
+            // Host choice: round like FreeType's `FT_DivFix(ppem·64, upem)`
+            // (the Swift harness truncated). WCVTF/SSW/MIRP-unscaled paths
+            // then agree with the CVT/outline scaling in `hinter.rs`, and
+            // fonts that derive CVT indices from a scaled constant (e.g.
+            // `cvt[1] = 2048·2048 FUnits`) read the same entries as FreeType.
             units_per_em_scale: stretch.mul_div(
                 F16Dot16::from_int(64),
                 F16Dot16::from_int(i32::from(units_per_em)),
-                Rounding::TowardZero,
+                Rounding::ToNearestOrAway,
             ),
         }
     }

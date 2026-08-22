@@ -1,4 +1,5 @@
 // this_file: typftth/tests/sround_reference.rs
+#![allow(clippy::large_const_arrays)]
 // Generated from Apple's SuperRoundReferenceData.swift ("Values generated from the reference interpreter").
 // Do not edit by hand.
 

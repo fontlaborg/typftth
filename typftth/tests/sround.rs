@@ -1,4 +1,5 @@
 // this_file: typftth/tests/sround.rs
+#![allow(clippy::needless_range_loop)]
 //! SROUND / S45ROUND rounding against Apple's reference-interpreter table.
 
 mod sround_reference;

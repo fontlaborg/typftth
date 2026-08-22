@@ -203,7 +203,24 @@ pub(crate) struct Run<'m, 'a, 'g> {
 impl<'m, 'a, 'g> Run<'m, 'a, 'g> {
     fn main_loop(&mut self, observer: &mut dyn StepObserver) -> Result<(), InterpreterError> {
         loop {
-            while let Some(opcode) = self.exec.next_opcode(true) {
+            loop {
+                // A function/patch body ends just before its ENDF. FreeType
+                // executes (and debuggers record) that ENDF as a step, once
+                // per LOOPCALL iteration; report it so traces line up 1:1.
+                if self.exec.top.is_at_end() && self.exec.top.stream_type != crate::exec::StreamType::Program {
+                    let view = StepView {
+                        machine: self.m,
+                        exec: &self.exec,
+                        glyph: self.glyph.as_deref(),
+                        twilight: &self.twilight,
+                        ip: self.exec.top.end(),
+                        opcode: crate::opcodes::ENDF,
+                    };
+                    if observer.before_instruction(&view) == Flow::Stop {
+                        return Err(InterpreterError::Stopped);
+                    }
+                }
+                let Some(opcode) = self.exec.next_opcode(true) else { break };
                 let ip = self.exec.top.index - 1;
                 let view = StepView {
                     machine: self.m,

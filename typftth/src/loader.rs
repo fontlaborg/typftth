@@ -145,8 +145,12 @@ impl<'a> HintFont<'a> {
     }
 
     /// CVT values in FUnits at `coords` (`cvar` applied).
+    /// CVT entries at `coords` in **26.6 FUnits** (`value << 6`), the way
+    /// FreeType stores `face->cvt`: `cvar` deltas (16.16) are added with
+    /// 1/64 FUnit precision (`FT_fixedToFdot6`), not rounded to whole
+    /// FUnits. Scale with [`crate::hinter::scale_cvt`].
     pub fn cvt_at(&self, coords: &[F2Dot14]) -> Vec<i32> {
-        let mut values: Vec<i32> = self.cvt.iter().map(|&v| i32::from(v)).collect();
+        let mut values: Vec<i32> = self.cvt.iter().map(|&v| i32::from(v) << 6).collect();
         if coords.is_empty() || coords.iter().all(|c| c.0 == 0) {
             return values;
         }
@@ -154,9 +158,9 @@ impl<'a> HintFont<'a> {
             let rf: Vec<RfF2Dot14> = coords.iter().map(|c| RfF2Dot14::from_bits(c.0)).collect();
             let mut deltas = vec![0i32; values.len()];
             if cvar.deltas(self.axes.len() as u16, &rf, &mut deltas).is_ok() {
-                // deltas are 16.16 fixed; round to nearest FUnit like FreeType
                 for (v, d) in values.iter_mut().zip(deltas) {
-                    *v += (d + 0x8000) >> 16;
+                    // FT_fixedToFdot6: (x + 0x200) >> 10 (arithmetic shift)
+                    *v += (d.wrapping_add(0x200)) >> 10;
                 }
             }
         }

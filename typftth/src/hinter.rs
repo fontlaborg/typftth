@@ -68,15 +68,11 @@ impl<'a> Hinter<'a> {
         coords: &[F2Dot14],
         observer: &mut dyn StepObserver,
     ) -> Result<Hinter<'a>, LoadError> {
-        let cvt_funits = font.cvt_at(coords);
-        let mut m = Machine::new(font.maxp, cvt_funits.len());
+        let cvt_fdot6 = font.cvt_at(coords);
+        let mut m = Machine::new(font.maxp, cvt_fdot6.len());
         m.set_ppem(ppem, font.units_per_em as i16);
         m.set_coords(coords);
-        // CVT: FUnits → 26.6 pixels with the same factor WCVTF uses
-        // (`units_per_em_scale` = ppem·64/upem already includes the ×64).
-        let scale = m.scale.units_per_em_scale.x;
-        let _ = scale;
-        let cvt: Vec<i32> = cvt_funits.iter().map(|&v| scale_funit_i32(v, ppem, font.units_per_em)).collect();
+        let cvt: Vec<i32> = cvt_fdot6.iter().map(|&v| scale_cvt(v, ppem, font.units_per_em)).collect();
         m.set_cvt(&cvt);
         let code = Code { fpgm: font.fpgm, prep: font.prep, glyf: &[] };
         let mut prep_error = None;
@@ -135,6 +131,25 @@ impl<'a> Hinter<'a> {
         };
         Ok(HintedGlyph { zone, error, outline })
     }
+}
+
+/// CVT entry (26.6 FUnits, see [`HintFont::cvt_at`]) → 26.6 pixels exactly
+/// as FreeType's `tt_size_run_prep` does it: the 16.16 scale is first
+/// **shifted right by 6** (dropping precision), then applied with
+/// `FT_MulFix`. This is why FreeType's scaled CVT can differ by one unit
+/// from `scale_funit` of the same value; fonts that branch on CVT values
+/// or derive CVT indices from them depend on it.
+#[inline]
+pub fn scale_cvt(v_fdot6: i32, ppem: i32, upem: u16) -> i32 {
+    let s = ft_scale(ppem, upem) >> 6;
+    ft_mul_fix(i64::from(v_fdot6), s)
+}
+
+/// `FT_MulFix(a, b)`: `(a·b + 0x8000 − (a·b < 0)) >> 16` (arithmetic shift).
+#[inline]
+pub fn ft_mul_fix(a: i64, b: i64) -> i32 {
+    let ab = a * b;
+    ((ab + 0x8000 - i64::from(ab < 0)) >> 16) as i32
 }
 
 /// FUnit → 26.6 pixels exactly as FreeType does it: the scale is first
