@@ -10,6 +10,7 @@ repository.workspace = true
 authors.workspace = true
 keywords = ["truetype", "hinting", "font", "interpreter"]
 categories = ["text-processing", "parsing"]
+readme = "../README.md"
 
 [features]
 default = ["std", "loader"]
