@@ -1,2 +1,187 @@
 //! this_file: typftth-cli/src/main.rs
-fn main() {}
+//!
+//! `typftth` — hint TrueType glyphs from the command line.
+
+use std::path::PathBuf;
+
+use clap::{Parser, Subcommand};
+use typftth::hinter::Hinter;
+use typftth::loader::HintFont;
+use typftth::trace::{Recorder, StepCounter};
+use typftth::F2Dot14;
+
+#[derive(Parser)]
+#[command(name = "typftth", version, about = "TrueType hinting interpreter (Apple GX lineage)")]
+struct Cli {
+    #[command(subcommand)]
+    cmd: Cmd,
+}
+
+#[derive(Subcommand)]
+enum Cmd {
+    /// Print hinting-related facts about a font.
+    Info {
+        font: PathBuf,
+        #[arg(long, default_value_t = 0)]
+        index: u32,
+    },
+    /// Hint one glyph and print the hinted points as JSON.
+    Hint {
+        font: PathBuf,
+        #[arg(long, default_value_t = 0)]
+        index: u32,
+        /// Glyph id.
+        #[arg(long)]
+        gid: u32,
+        #[arg(long, default_value_t = 16)]
+        ppem: i32,
+        /// Axis setting, e.g. `wght=700` (repeatable).
+        #[arg(long = "var")]
+        vars: Vec<String>,
+        /// Write the debugger snapshot blob (v1) to this file.
+        #[arg(long)]
+        trace: Option<PathBuf>,
+    },
+    /// Hint every glyph at several sizes and report errors (corpus check).
+    Sweep {
+        font: PathBuf,
+        #[arg(long, default_value = "9,12,16,24,48")]
+        ppems: String,
+        #[arg(long = "var")]
+        vars: Vec<String>,
+        /// Limit to the first N glyphs.
+        #[arg(long)]
+        limit: Option<u32>,
+    },
+}
+
+fn parse_vars(vars: &[String]) -> Vec<([u8; 4], f32)> {
+    vars.iter()
+        .filter_map(|v| {
+            let (tag, val) = v.split_once('=')?;
+            let mut t = [b' '; 4];
+            for (i, b) in tag.bytes().take(4).enumerate() {
+                t[i] = b;
+            }
+            Some((t, val.parse().ok()?))
+        })
+        .collect()
+}
+
+fn main() {
+    if let Err(e) = run() {
+        eprintln!("error: {e}");
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<(), Box<dyn std::error::Error>> {
+    let cli = Cli::parse();
+    match cli.cmd {
+        Cmd::Info { font, index } => {
+            let data = std::fs::read(&font)?;
+            let f = HintFont::parse(&data, index)?;
+            println!("glyphs: {}", f.glyph_count);
+            println!("unitsPerEm: {}", f.units_per_em);
+            println!("fpgm: {} bytes, prep: {} bytes, cvt: {} entries", f.fpgm.len(), f.prep.len(), f.cvt.len());
+            println!(
+                "maxp: storage {} fdefs {} idefs {} stack {} twilight {} points {}/{}",
+                f.maxp.max_storage,
+                f.maxp.max_function_defs,
+                f.maxp.max_instruction_defs,
+                f.maxp.max_stack_elements,
+                f.maxp.max_twilight_points,
+                f.maxp.max_points,
+                f.maxp.max_composite_points
+            );
+            for a in &f.axes {
+                println!("axis {} {}..{}..{}", String::from_utf8_lossy(&a.tag), a.min, a.default, a.max);
+            }
+        }
+        Cmd::Hint { font, index, gid, ppem, vars, trace } => {
+            let data = std::fs::read(&font)?;
+            let f = HintFont::parse(&data, index)?;
+            let coords: Vec<F2Dot14> = f.location(&parse_vars(&vars));
+            let mut h = Hinter::new(&f, ppem, &coords)?;
+            if let Some(e) = h.prep_error {
+                eprintln!("prep failed: {e}");
+            }
+            let g = if let Some(path) = trace {
+                let mut rec = Recorder::new(f.units_per_em as u32, ppem as u32, gid);
+                let g = h.hint_glyph(gid, &mut rec)?;
+                rec.finish(&g.zone, g.error);
+                std::fs::write(&path, rec.to_blob())?;
+                eprintln!("trace: {} steps → {}", rec.step_count(), path.display());
+                g
+            } else {
+                let mut counter = StepCounter::default();
+                let g = h.hint_glyph(gid, &mut counter)?;
+                eprintln!("{} instructions", counter.steps);
+                g
+            };
+            let pts: Vec<serde_json::Value> = (0..g.zone.outline_points)
+                .map(|i| {
+                    serde_json::json!({
+                        "x": g.zone.x[i], "y": g.zone.y[i],
+                        "ox": g.zone.ox[i], "oy": g.zone.oy[i],
+                        "on": g.zone.on_curve[i] & 1 == 1,
+                        "touched": g.zone.f[i],
+                    })
+                })
+                .collect();
+            let out = serde_json::json!({
+                "gid": gid, "ppem": ppem, "composite": g.outline.is_composite,
+                "error": g.error.map(|e| e.name()),
+                "contours": g.outline.end_pts,
+                "advance26_6": g.advance().0,
+                "points": pts,
+            });
+            println!("{}", serde_json::to_string_pretty(&out)?);
+        }
+        Cmd::Sweep { font, ppems, vars, limit } => {
+            let data = std::fs::read(&font)?;
+            let f = HintFont::parse(&data, index_of(&font))?;
+            let coords: Vec<F2Dot14> = f.location(&parse_vars(&vars));
+            let sizes: Vec<i32> = ppems.split(',').filter_map(|s| s.trim().parse().ok()).collect();
+            let n = limit.unwrap_or(f.glyph_count).min(f.glyph_count);
+            let mut total = 0u64;
+            let mut errors = std::collections::BTreeMap::<String, usize>::new();
+            let mut composites = 0usize;
+            let mut steps = 0u64;
+            for &ppem in &sizes {
+                let mut h = Hinter::new(&f, ppem, &coords)?;
+                if let Some(e) = h.prep_error {
+                    println!("prep@{ppem}: {e}");
+                }
+                for gid in 0..n {
+                    let mut c = StepCounter::default();
+                    let g = h.hint_glyph(gid, &mut c)?;
+                    total += 1;
+                    steps += c.steps;
+                    if g.outline.is_composite {
+                        composites += 1;
+                    }
+                    if let Some(e) = g.error {
+                        *errors.entry(format!("{e}")).or_default() += 1;
+                        if errors.values().sum::<usize>() <= 10 {
+                            println!("gid {gid} @{ppem}: {e}{}", if g.outline.is_composite { " (composite)" } else { "" });
+                        }
+                    }
+                }
+            }
+            println!(
+                "{}: {} glyph-runs, {} composite, {} instructions, errors: {:?}",
+                font.display(),
+                total,
+                composites,
+                steps,
+                errors
+            );
+        }
+    }
+    Ok(())
+}
+
+fn index_of(_p: &std::path::Path) -> u32 {
+    0
+}
