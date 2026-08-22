@@ -43,6 +43,20 @@ impl HintedGlyph {
     }
 }
 
+/// How CVT entries are scaled from FUnits to 26.6 pixels. FreeType changed
+/// this between 2.13 and 2.14; fonts that branch on CVT values or derive
+/// CVT indices from scaled constants (Muli) hint differently under each.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CvtScaling {
+    /// FreeType ≥ 2.14: `FT_MulFix(funits, FT_DivFix(ppem·64, upem))` with
+    /// `cvar` deltas truncated to whole FUnits first (`face->cvt[i] / 64`).
+    #[default]
+    FreeType214,
+    /// FreeType ≤ 2.13: CVT kept in 26.6 FUnits, scale shifted right by 6
+    /// before `FT_MulFix` (loses precision).
+    FreeType213,
+}
+
 /// Host choices for a [`Hinter`] (all default to the reference behaviour).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct HinterOptions {
@@ -50,13 +64,20 @@ pub struct HinterOptions {
     pub getinfo: GetInfoProfile,
     /// Tolerate out-of-range CVT indices like FreeType (non-pedantic).
     pub lenient_cvt: bool,
+    /// CVT scaling rule.
+    pub cvt_scaling: CvtScaling,
 }
 
 impl HinterOptions {
-    /// Behave like FreeType as far as the host can: v35/v40 `GETINFO`
+    /// Behave like FreeType (2.14) as far as the host can: v35/v40 `GETINFO`
     /// reporting for the given target and lenient CVT access.
     pub fn freetype(getinfo: GetInfoProfile) -> HinterOptions {
-        HinterOptions { getinfo, lenient_cvt: true }
+        HinterOptions { getinfo, lenient_cvt: true, cvt_scaling: CvtScaling::FreeType214 }
+    }
+
+    /// Like [`HinterOptions::freetype`] but with FreeType 2.13's CVT scaling.
+    pub fn freetype_213(getinfo: GetInfoProfile) -> HinterOptions {
+        HinterOptions { getinfo, lenient_cvt: true, cvt_scaling: CvtScaling::FreeType213 }
     }
 }
 
@@ -103,7 +124,13 @@ impl<'a> Hinter<'a> {
         m.lenient_cvt = options.lenient_cvt;
         m.set_ppem(ppem, font.units_per_em as i16);
         m.set_coords(coords);
-        let cvt: Vec<i32> = cvt_fdot6.iter().map(|&v| scale_cvt(v, ppem, font.units_per_em)).collect();
+        let cvt: Vec<i32> = cvt_fdot6
+            .iter()
+            .map(|&v| match options.cvt_scaling {
+                CvtScaling::FreeType214 => scale_cvt_214(v, ppem, font.units_per_em),
+                CvtScaling::FreeType213 => scale_cvt(v, ppem, font.units_per_em),
+            })
+            .collect();
         m.set_cvt(&cvt);
         let code = Code { fpgm: font.fpgm, prep: font.prep, glyf: &[] };
         let mut prep_error = None;
@@ -168,8 +195,16 @@ impl<'a> Hinter<'a> {
     }
 }
 
+/// CVT entry (26.6 FUnits) → 26.6 pixels as FreeType 2.14 does it:
+/// `FT_MulFix(v / 64, FT_DivFix(ppem·64, upem))` (C division truncates the
+/// `cvar`-adjusted value toward zero; the scale keeps full precision).
+#[inline]
+pub fn scale_cvt_214(v_fdot6: i32, ppem: i32, upem: u16) -> i32 {
+    ft_mul_fix(i64::from(v_fdot6 / 64), ft_scale(ppem, upem))
+}
+
 /// CVT entry (26.6 FUnits, see [`HintFont::cvt_at`]) → 26.6 pixels exactly
-/// as FreeType's `tt_size_run_prep` does it: the 16.16 scale is first
+/// as FreeType **2.13**'s `tt_size_run_prep` does it: the 16.16 scale is first
 /// **shifted right by 6** (dropping precision), then applied with
 /// `FT_MulFix`. This is why FreeType's scaled CVT can differ by one unit
 /// from `scale_funit` of the same value; fonts that branch on CVT values

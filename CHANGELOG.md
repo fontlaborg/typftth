@@ -1,6 +1,15 @@
 <!-- this_file: CHANGELOG.md -->
 # Changelog
 
+## 0.3.0 — 2026-08-22
+
+### Changed
+- CVT scaling follows FreeType **2.14** by default (`CvtScaling::FreeType214`:
+  `FT_MulFix(funits, scale)` with `cvar` deltas truncated to FUnits); the 2.13
+  rule (`scale >> 6`) is available as `CvtScaling::FreeType213`
+  (`HinterOptions::freetype_213`, CLI `--cvt213`, wasm `recordWithCvt`).
+  Against FreeType 2.14.3 the corpus agreement is unchanged at 99.2 %.
+
 ## 0.2.0 — 2026-08-22
 
 ### Fixed

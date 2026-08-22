@@ -82,12 +82,12 @@ typftth sweep Font.ttf --ppems 9,12,16,24,48      # corpus health check
 ## Scaling
 
 Points are scaled like FreeType (`FT_DivFix`/`FT_MulFix`, round to nearest)
-and CVT entries exactly like FreeType's `tt_size_run_prep` (26.6 FUnits ×
-`scale >> 6`, which is *not* the same rounding), so unhinted outlines and
-the initial CVT are identical to FreeType's and engine comparisons only show
-interpreter differences. On a 27-font variable corpus at 12/16/24 ppem,
-99.2 % of simple glyphs hint to within 1/64 px of FreeType v35; the rest
-differ through `IP` rounding. See `docs/bincompat.md`.
+and CVT entries exactly like FreeType's `tt_size_run_prep` (2.14 rule by
+default; the 2.13 `scale >> 6` rule via `CvtScaling::FreeType213`), so
+unhinted outlines and the initial CVT are identical to FreeType's and engine
+comparisons only show interpreter differences. On a 27-font variable corpus
+at 12/16/24 ppem, 99.2 % of simple glyphs hint to within 1/64 px of FreeType
+2.14.3 v35; the rest differ through `IP` rounding. See `docs/bincompat.md`.
 
 ## Licence
 

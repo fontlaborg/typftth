@@ -59,3 +59,12 @@ fn cvt_scaling_drops_scale_precision_like_freetype() {
     assert_eq!(scale_cvt(729 << 6, 16, 1000), 746);
     assert_eq!(scale_cvt(104 << 6, 16, 1000), 106);
 }
+
+/// FreeType 2.14 scales with full precision: 729 FUnits @ 9 ppem → 420.
+#[test]
+fn cvt_scaling_214_rounds_with_full_precision() {
+    use typftth::hinter::scale_cvt_214;
+    assert_eq!(scale_cvt_214(729 << 6, 9, 1000), 420);
+    assert_eq!(scale_cvt_214(515 << 6, 12, 1000), 396, "Muli cvt[46] @12 under 2.14");
+    assert_eq!(scale_cvt_214((515 << 6) + 40, 12, 1000), 396, "cvar fraction truncated before scaling");
+}

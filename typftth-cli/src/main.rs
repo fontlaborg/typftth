@@ -50,6 +50,9 @@ enum Cmd {
         /// Render target used for the FreeType-style GETINFO flags: mono, gray, lcd, lcd-v.
         #[arg(long, default_value = "mono")]
         render: String,
+        /// Scale the CVT like FreeType 2.13 (scale >> 6) instead of 2.14.
+        #[arg(long)]
+        cvt213: bool,
     },
     /// Hint every glyph at several sizes and report errors (corpus check).
     Sweep {
@@ -107,7 +110,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 println!("axis {} {}..{}..{}", String::from_utf8_lossy(&a.tag), a.min, a.default, a.max);
             }
         }
-        Cmd::Hint { font, index, gid, ppem, vars, trace, program, getinfo, render } => {
+        Cmd::Hint { font, index, gid, ppem, vars, trace, program, getinfo, render, cvt213 } => {
             let data = std::fs::read(&font)?;
             let f = HintFont::parse(&data, index)?;
             let coords: Vec<F2Dot14> = f.location(&parse_vars(&vars));
@@ -121,7 +124,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             let mut rec = Recorder::new(f.units_per_em as u32, ppem as u32, gid);
             rec.only = Some(only);
             let trace_setup = trace.is_some() && only != typftth::exec::Program::Glyf;
-            let options = typftth::hinter::HinterOptions { getinfo: profile, lenient_cvt: getinfo != "gx" };
+            let options = typftth::hinter::HinterOptions {
+                getinfo: profile,
+                lenient_cvt: getinfo != "gx",
+                cvt_scaling: if cvt213 { typftth::hinter::CvtScaling::FreeType213 } else { typftth::hinter::CvtScaling::FreeType214 },
+            };
             let mut h = if trace_setup {
                 Hinter::with_options(f.clone(), ppem, &coords, options, &mut rec)?
             } else {

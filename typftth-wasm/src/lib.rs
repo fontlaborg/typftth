@@ -83,15 +83,25 @@ impl TthFont {
     /// `TT_RENDER_*` codes).
     #[wasm_bindgen(js_name = recordWith)]
     pub fn record_with(&self, gid: u32, ppem: u32, coords: &[i16], version: u32, render: u32) -> Result<Vec<u8>, JsError> {
+        self.record_with_cvt(gid, ppem, coords, version, render, false)
+    }
+
+    /// `recordWith` plus a choice of CVT scaling: `cvt213 = true` reproduces
+    /// FreeType ≤ 2.13 (scale shifted right by 6), `false` FreeType ≥ 2.14.
+    #[wasm_bindgen(js_name = recordWithCvt)]
+    pub fn record_with_cvt(&self, gid: u32, ppem: u32, coords: &[i16], version: u32, render: u32, cvt213: bool) -> Result<Vec<u8>, JsError> {
         let f = HintFont::parse(&self.data, self.index).map_err(|e| JsError::new(&e.to_string()))?;
         let coords: Vec<F2Dot14> = coords.iter().map(|&c| F2Dot14(c)).collect();
         let variation = !f.axes.is_empty();
         let mono = render == 1;
-        let options = match version {
+        let mut options = match version {
             35 => HinterOptions::freetype(GetInfoProfile::freetype_v35(!mono, variation)),
             40 => HinterOptions::freetype(GetInfoProfile::freetype_v40(mono, render == 2, render == 3, variation)),
             _ => HinterOptions::default(),
         };
+        if cvt213 {
+            options.cvt_scaling = typftth::hinter::CvtScaling::FreeType213;
+        }
         let mut h = Hinter::with_options(f.clone(), ppem as i32, &coords, options, &mut typftth::NoTrace)
             .map_err(|e| JsError::new(&e.to_string()))?;
         let mut rec = Recorder::new(self.upem, ppem, gid);

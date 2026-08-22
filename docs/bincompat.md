@@ -54,7 +54,7 @@ implementation would produce different pixels.
 | What | Choice | Why |
 |---|---|---|
 | FUnit → 26.6 scaling of points | `FT_DivFix`/`FT_MulFix` emulation (round to nearest) | identical unhinted outlines to FreeType, so engine diffs show only interpreter semantics (`hinter::scale_funit`) |
-| CVT scaling | FreeType `tt_size_run_prep`: CVT kept in 26.6 FUnits, scale = `FT_DivFix(ppem·64, upem) >> 6`, then `FT_MulFix` (`hinter::scale_cvt`) | the dropped six bits make e.g. 729 FUnits @ 9 ppem/1000 upem scale to 419 (not 420); fonts that branch on CVT values or derive CVT indices from scaled constants (Muli) depend on it |
+| CVT scaling | `CvtScaling::FreeType214` (default): `FT_MulFix(cvt26_6 / 64, FT_DivFix(ppem·64, upem))` (`hinter::scale_cvt_214`); `FreeType213`: scale `>> 6` first (`hinter::scale_cvt`) | FreeType 2.13 dropped six bits of the scale (729 FUnits @ 9 ppem/1000 upem → 419, not 420) and 2.14 fixed it; fonts that branch on CVT values or derive CVT indices from scaled constants (Muli) hint differently under each |
 | `units_per_em_scale` (WCVTF, SSW, unscaled MIRP/MDRP) | `FT_DivFix(ppem·64, upem)` rounded to nearest (the Swift harness truncated) | same factor as point scaling |
 | ENDF | reported to the step observer (ip = ENDF position) once per LOOPCALL iteration | FreeType executes ENDF as an instruction; traces line up 1:1 |
 | Phantom points | FreeType convention: pp1 = (xMin − lsb, 0), pp2 = pp1 + advance, pp3/pp4 = (0, 0); `gvar` phantom deltas applied | matches the debugger's FreeType sessions |

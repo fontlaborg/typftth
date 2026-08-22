@@ -14,7 +14,7 @@ name = "typftth"
 path = "src/main.rs"
 
 [dependencies]
-typftth = { version = "0.2.0", path = "../typftth" }
+typftth = { version = "0.3.0", path = "../typftth" }
 clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
