@@ -49,7 +49,9 @@ pub struct GlyphOutline {
     pub lsb: i16,
 }
 
-/// The hinting-relevant view of a TrueType font.
+/// The hinting-relevant view of a TrueType font. Cheap to clone (borrowed
+/// table slices plus the CVT and axis list).
+#[derive(Clone)]
 pub struct HintFont<'a> {
     font: FontRef<'a>,
     glyf: Glyf<'a>,

@@ -44,8 +44,8 @@ impl HintedGlyph {
 }
 
 /// Hinting context for one (font, ppem, location).
-pub struct Hinter<'f, 'a> {
-    pub font: &'f HintFont<'a>,
+pub struct Hinter<'a> {
+    pub font: HintFont<'a>,
     pub ppem: i32,
     pub coords: Vec<F2Dot14>,
     /// Machine state after `fpgm` + `prep`.
@@ -55,19 +55,19 @@ pub struct Hinter<'f, 'a> {
     zone: Zone,
 }
 
-impl<'f, 'a> Hinter<'f, 'a> {
+impl<'a> Hinter<'a> {
     /// Run `fpgm` and `prep` for `ppem` at `coords` (normalized 2.14).
-    pub fn new(font: &'f HintFont<'a>, ppem: i32, coords: &[F2Dot14]) -> Result<Hinter<'f, 'a>, LoadError> {
+    pub fn new(font: HintFont<'a>, ppem: i32, coords: &[F2Dot14]) -> Result<Hinter<'a>, LoadError> {
         Self::with_observer(font, ppem, coords, &mut NoTrace)
     }
 
     /// Like [`Hinter::new`] but tracing the `fpgm`/`prep` runs.
     pub fn with_observer(
-        font: &'f HintFont<'a>,
+        font: HintFont<'a>,
         ppem: i32,
         coords: &[F2Dot14],
         observer: &mut dyn StepObserver,
-    ) -> Result<Hinter<'f, 'a>, LoadError> {
+    ) -> Result<Hinter<'a>, LoadError> {
         let cvt_funits = font.cvt_at(coords);
         let mut m = Machine::new(font.maxp, cvt_funits.len());
         m.set_ppem(ppem, font.units_per_em as i16);

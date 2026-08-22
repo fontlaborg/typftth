@@ -102,7 +102,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             let data = std::fs::read(&font)?;
             let f = HintFont::parse(&data, index)?;
             let coords: Vec<F2Dot14> = f.location(&parse_vars(&vars));
-            let mut h = Hinter::new(&f, ppem, &coords)?;
+            let mut h = Hinter::new(f.clone(), ppem, &coords)?;
             if let Some(e) = h.prep_error {
                 eprintln!("prep failed: {e}");
             }
@@ -149,7 +149,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             let mut composites = 0usize;
             let mut steps = 0u64;
             for &ppem in &sizes {
-                let mut h = Hinter::new(&f, ppem, &coords)?;
+                let mut h = Hinter::new(f.clone(), ppem, &coords)?;
                 if let Some(e) = h.prep_error {
                     println!("prep@{ppem}: {e}");
                 }

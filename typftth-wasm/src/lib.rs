@@ -69,7 +69,7 @@ impl TthFont {
     pub fn record(&self, gid: u32, ppem: u32, coords: &[i16]) -> Result<Vec<u8>, JsError> {
         let f = HintFont::parse(&self.data, self.index).map_err(|e| JsError::new(&e.to_string()))?;
         let coords: Vec<F2Dot14> = coords.iter().map(|&c| F2Dot14(c)).collect();
-        let mut h = Hinter::new(&f, ppem as i32, &coords).map_err(|e| JsError::new(&e.to_string()))?;
+        let mut h = Hinter::new(f.clone(), ppem as i32, &coords).map_err(|e| JsError::new(&e.to_string()))?;
         let mut rec = Recorder::new(self.upem, ppem, gid);
         let g = h.hint_glyph(gid, &mut rec).map_err(|e| JsError::new(&e.to_string()))?;
         rec.finish(&g.zone, g.error);
@@ -81,7 +81,7 @@ impl TthFont {
     pub fn hint(&self, gid: u32, ppem: u32, coords: &[i16]) -> Result<Vec<i32>, JsError> {
         let f = HintFont::parse(&self.data, self.index).map_err(|e| JsError::new(&e.to_string()))?;
         let coords: Vec<F2Dot14> = coords.iter().map(|&c| F2Dot14(c)).collect();
-        let mut h = Hinter::new(&f, ppem as i32, &coords).map_err(|e| JsError::new(&e.to_string()))?;
+        let mut h = Hinter::new(f.clone(), ppem as i32, &coords).map_err(|e| JsError::new(&e.to_string()))?;
         let g = h.hint_glyph(gid, &mut typftth::NoTrace).map_err(|e| JsError::new(&e.to_string()))?;
         let mut out = Vec::with_capacity(g.zone.outline_points * 2);
         for (x, y) in g.zone.hinted_points() {

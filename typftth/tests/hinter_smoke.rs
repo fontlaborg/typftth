@@ -11,7 +11,7 @@ fn corpus(name: &str) -> Option<Vec<u8>> {
 fn cvt_is_scaled_to_pixels() {
     let Some(data) = corpus("Elstob-Regular.ttf") else { return };
     let f = HintFont::parse(&data, 0).unwrap();
-    let h = Hinter::new(&f, 16, &[]).unwrap();
+    let h = Hinter::new(f.clone(), 16, &[]).unwrap();
     let scale = h.machine().scale.units_per_em_scale.x;
     assert_eq!(scale.0, 0x10624, "16 ppem / 1000 upem → 1.024 in 16.16");
     // prep may round CVT entries; check a fresh machine without prep instead.
