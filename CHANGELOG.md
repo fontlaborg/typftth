@@ -11,6 +11,9 @@
   FreeType at every tested size (`hinter::scale_cvt`, `HintFont::cvt_at`).
 - `ScaleFactors::units_per_em_scale` rounds like `FT_DivFix` instead of
   truncating, so WCVTF/SSW agree with point scaling.
+- `Hinter::hint_glyph` honours `INSTCTRL` no-grid-fit from `prep` (skips
+  the glyph program like FreeType's `FT_LOAD_NO_HINTING`); Junicode at
+  12 ppem now matches.
 - The step observer now sees `ENDF` (once per LOOPCALL iteration) so traces
   align 1:1 with FreeType's.
 

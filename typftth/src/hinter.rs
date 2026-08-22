@@ -136,7 +136,11 @@ impl<'a> Hinter<'a> {
         });
         let mut m = self.base.clone();
         let code = Code { fpgm: self.font.fpgm, prep: self.font.prep, glyf: &outline.instructions };
-        let error = if outline.instructions.is_empty() {
+        // INSTCTRL selector 1 set by `prep` disables grid-fitting for every
+        // glyph at this size (FreeType: `FT_LOAD_NO_HINTING`). The reference
+        // interpreter only records the flag; the host has to honour it.
+        let no_grid_fit = self.base.gs.instruct_control.contains(crate::gs::InstructControl::NO_GRID_FIT);
+        let error = if outline.instructions.is_empty() || no_grid_fit {
             None
         } else {
             let unscaled_wrong = outline.is_composite && !self.coords.is_empty();
